@@ -75,7 +75,7 @@ func TimeRangeFromPaths(startPath TimePath, endPath TimePath) []TimePath {
 
 	firstDifferingIndex := len(start)
 	for i := range startPath {
-		if !bytes.Equal(start[i].Representation(), end[i].Representation()) {
+		if !bytes.Equal(start[i], end[i]) {
 			firstDifferingIndex = i
 			break
 		} else if start[i].Quantity() > end[i].Quantity() {

@@ -61,12 +61,6 @@ func (uc URIComponent) Type() PatternComponentType {
 	return URIComponentType
 }
 
-// Representation returns a byte-slice representation of this URIComponent,
-// encoding both its name and position.
-func (uc URIComponent) Representation() []byte {
-	return uc
-}
-
 // String returns a printable string representing this URIComponent.
 func (uc URIComponent) String() string {
 	if uc == nil {
@@ -180,10 +174,9 @@ func URIToBytes(up URIPath) []byte {
 	buf[0] = byte(len(up))
 	start := 1
 	for _, component := range up {
-		rep := component.Representation()
-		copy(buf[start:], rep)
-		buf[start+len(rep)] = 255
-		start += len(rep) + 1
+		copy(buf[start:], component)
+		buf[start+len(component)] = 255
+		start += len(component) + 1
 	}
 	return buf
 }

@@ -47,7 +47,6 @@ const (
 // TimeComponent. It describes a component in a pattern.
 type PatternComponent interface {
 	Type() PatternComponentType
-	Representation() []byte
 	String() string
 
 	// These functions are useful if you don't want to use a type assertion
@@ -92,13 +91,13 @@ func EncodePattern(uripath URIPath, timepath TimePath, into Pattern) {
 		panic("Not enough space to encode pattern")
 	}
 	for i, component := range uripath {
-		into[i] = component.Representation()
+		into[i] = component
 	}
 	for j := len(uripath); j != len(into)-MaxTimeLength; j++ {
 		into[j] = nil
 	}
 	for k, component := range timepath {
-		into[len(into)-MaxTimeLength+k] = component.Representation()
+		into[len(into)-MaxTimeLength+k] = component
 	}
 }
 

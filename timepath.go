@@ -194,12 +194,6 @@ func (tc TimeComponent) Type() PatternComponentType {
 	return TimeComponentType
 }
 
-// Representation returns a byte-slice representation of this TimeComponent,
-// encoding both its name and position.
-func (tc TimeComponent) Representation() []byte {
-	return tc
-}
-
 // String returns a printable string representing this TimeComponent.
 func (tc TimeComponent) String() string {
 	return strconv.FormatInt(int64(tc.Quantity()), 10)
