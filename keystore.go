@@ -64,8 +64,8 @@ type KeyStoreReader interface {
 	// hierarchy.
 	ParamsForHierarchy(hierarchy []byte) (*wkdibe.Params, error)
 
-	// KeyForPattern retrieves a key whose pattern matches the one provided,
-	// where "matches" is defined as in Section 3.1 of the JEDI paper (see the
-	// README.md file for a full citation of the paper).
-	KeyForPattern(hierarchy []byte, pattern Pattern, keyType KeyType) (*wkdibe.SecretKey, Pattern, error)
+	// KeyForPattern retrieves a key whose pattern matches the provided URI
+	// and time, where "matches" is defined as in Section 3.1 of the JEDI paper
+	// (see the README.md file for a full citation of the paper).
+	KeyForPattern(hierarchy []byte, uripath URIPath, timepath TimePath, keyType KeyType) (*wkdibe.SecretKey, Pattern, error)
 }

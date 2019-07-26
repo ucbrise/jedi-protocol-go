@@ -32,6 +32,8 @@
 
 package jedi
 
+import "bytes"
+
 // PatternComponentType encodes the type of a pattern component.
 type PatternComponentType int
 
@@ -65,6 +67,21 @@ func (p Pattern) GetComponent(index int) PatternComponent {
 		return URIComponent(p[index])
 	}
 	return TimeComponent(p[index])
+}
+
+// Matches returns a boolean indicating whether this Pattern matches the one
+// provided as an argument. The term "matches" is defined in Section 3.1 of the
+// JEDI paper (see the README.md file for a full citation of the paper).
+func (p Pattern) Matches(q Pattern) bool {
+	if len(p) != len(q) {
+		panic("Patterns must be the same length to check matching")
+	}
+	for i, comp := range p {
+		if comp != nil && !bytes.Equal(comp, q[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // EncodePattern encodes a URIPath and TimePath into a pattern, where each

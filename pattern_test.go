@@ -190,3 +190,41 @@ func TestPatternComponent(t *testing.T) {
 		t.Fatal("Second-to-last component has incorrect string")
 	}
 }
+
+func TestPatternMatch(t *testing.T) {
+	uripath1, err := ParseURI("a/b/c/*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	uripath2, err := ParseURI("a/b/c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	timepath, err := ParseTime(time.Unix(1564089385, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pattern1 := make(Pattern, 20)
+	EncodePattern(uripath1, timepath, pattern1)
+	pattern2 := make(Pattern, 20)
+	EncodePattern(uripath2, timepath, pattern2)
+
+	if !pattern1.Matches(pattern2) {
+		t.FailNow()
+	}
+	if pattern2.Matches(pattern1) {
+		t.FailNow()
+	}
+}
+
+func TestPatternMatchPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("Matches() did not panic for different-length patterns")
+		}
+	}()
+	pattern1 := make(Pattern, 19)
+	pattern2 := make(Pattern, 20)
+	pattern1.Matches(pattern2)
+}
