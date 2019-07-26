@@ -90,45 +90,19 @@ func EncodePattern(uripath URIPath, timepath TimePath, into Pattern) {
 	if len(into) < len(uripath)+MaxTimeLength {
 		panic("Not enough space to encode pattern")
 	}
-	for i, component := range uripath {
-		into[i] = component
-	}
-	for j := len(uripath); j != len(into)-MaxTimeLength; j++ {
-		into[j] = nil
-	}
-	for k, component := range timepath {
-		into[len(into)-MaxTimeLength+k] = component
-	}
+	EncodeURIPathInto(uripath, into[:len(into)-MaxTimeLength])
+	EncodeTimePathInto(timepath, into[len(into)-MaxTimeLength:])
 }
 
 // DecodePattern decodes a pattern encoded as a byte slice for each component
 // back into its component URI and time.
-func DecodePattern(pattern [][]byte) (URIPath, TimePath) {
+func DecodePattern(pattern Pattern) (URIPath, TimePath) {
 	if len(pattern) < MaxTimeLength {
 		panic("Pattern is too short to be valid")
 	}
 
-	var lastNonNilIndex int
-
-	uripath := make(URIPath, 0, len(pattern)-MaxTimeLength)
-	lastNonNilIndex = -1
-	for i, slot := range pattern[:len(pattern)-MaxTimeLength] {
-		if slot != nil {
-			lastNonNilIndex = i
-		}
-		uripath = append(uripath, URIComponent(slot))
-	}
-	uripath = uripath[:lastNonNilIndex+1]
-
-	timepath := make(TimePath, 0, MaxTimeLength)
-	lastNonNilIndex = -1
-	for i, slot := range pattern[len(pattern)-MaxTimeLength:] {
-		if slot != nil {
-			lastNonNilIndex = i
-		}
-		timepath = append(timepath, TimeComponent(slot))
-	}
-	timepath = timepath[:lastNonNilIndex+1]
+	uripath := DecodeURIPathFrom(pattern[:len(pattern)-MaxTimeLength])
+	timepath := DecodeTimePathFrom(pattern[len(pattern)-MaxTimeLength:])
 
 	return uripath, timepath
 }

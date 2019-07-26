@@ -272,6 +272,32 @@ func (tp TimePath) String() string {
 	return strings.Join(components, "/")
 }
 
+// EncodeTimePathInto encodes a TimePath into a pattern, where each component
+// is represented as a byte slice. The slice into which to encode the pattern
+// is provided as an argument.
+func EncodeTimePathInto(tp TimePath, into Pattern) {
+	for i, component := range tp {
+		into[i] = component
+	}
+}
+
+// DecodeTimePathFrom decodes a TimePath from a pattern, where each component
+// is represented as a byte slice.
+func DecodeTimePathFrom(from Pattern) TimePath {
+	var j int
+	for j = len(from) - 1; j != -1; j-- {
+		if from[j] != nil {
+			break
+		}
+	}
+
+	timepath := make(TimePath, 0, j+1)
+	for i := 0; i <= j; i++ {
+		timepath = append(timepath, TimeComponent(from[i]))
+	}
+	return timepath
+}
+
 // TimeToBytes marshals a TimePath into a string of bytes.
 func TimeToBytes(tp TimePath) []byte {
 	length := 0

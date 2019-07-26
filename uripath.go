@@ -163,6 +163,35 @@ func (up URIPath) String() string {
 	return strings.Join(components, "/")
 }
 
+// EncodeURIPathInto encodes a URIPath into a pattern, where each component is
+// represented as a byte slice. The slice into which to encode the pattern is
+// provided as an argument.
+func EncodeURIPathInto(up URIPath, into Pattern) {
+	for i, component := range up {
+		into[i] = component
+	}
+	for j := len(up); j != len(into); j++ {
+		into[j] = nil
+	}
+}
+
+// DecodeURIPathFrom decodes a URIPath from a pattern, where each component is
+// represented as a byte slice.
+func DecodeURIPathFrom(from Pattern) URIPath {
+	var j int
+	for j = len(from) - 1; j != -1; j-- {
+		if from[j] != nil {
+			break
+		}
+	}
+
+	uripath := make(URIPath, 0, j+1)
+	for i := 0; i <= j; i++ {
+		uripath = append(uripath, URIComponent(from[i]))
+	}
+	return uripath
+}
+
 // URIToBytes marshals a URIPath into a string of bytes.
 func URIToBytes(up URIPath) []byte {
 	length := 0
