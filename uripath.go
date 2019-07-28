@@ -41,9 +41,6 @@ import (
 // URIComponentPosition describes the index of a URIComponent in a URIPath.
 type URIComponentPosition uint8
 
-// MaxURILength is the maximum supported length of a URIPath.
-const MaxURILength = 14
-
 // URIComponent describes a component of a URIPath.
 type URIComponent []byte
 
@@ -103,10 +100,6 @@ func ValidateURIComponent(uri string) bool {
 // ParseURIFromPath takes a slice of URI components and produces a URIPath
 // representing that URI or URI prefix.
 func ParseURIFromPath(uriPath []string) (URIPath, error) {
-	if len(uriPath) > MaxURILength {
-		return nil, errors.New("URI too long")
-	}
-
 	prefix := false
 	components := make(URIPath, 0, len(uriPath)+1)
 	for i, name := range uriPath {

@@ -32,7 +32,13 @@
 
 package jedi
 
-import "bytes"
+import (
+	"bytes"
+	"math/big"
+
+	"github.com/ucbrise/jedi-pairing/lang/go/cryptutils"
+	"github.com/ucbrise/jedi-pairing/lang/go/wkdibe"
+)
 
 // PatternComponentType encodes the type of a pattern component.
 type PatternComponentType int
@@ -68,6 +74,20 @@ func (p Pattern) GetComponent(index int) PatternComponent {
 	return TimeComponent(p[index])
 }
 
+// Equals returns a boolean indicating whther this Pattern equals the one
+// provided as an argument.
+func (p Pattern) Equals(q Pattern) bool {
+	if len(p) != len(q) {
+		return false
+	}
+	for i, comp := range p {
+		if !bytes.Equal(comp, q[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // Matches returns a boolean indicating whether this Pattern matches the one
 // provided as an argument. The term "matches" is defined in Section 3.1 of the
 // JEDI paper (see the README.md file for a full citation of the paper).
@@ -76,16 +96,54 @@ func (p Pattern) Matches(q Pattern) bool {
 		panic("Patterns must be the same length to check matching")
 	}
 	for i, comp := range p {
-		if comp != nil && !bytes.Equal(comp, q[i]) {
+		if len(comp) != 0 && !bytes.Equal(comp, q[i]) {
 			return false
 		}
 	}
 	return true
 }
 
+// ToAttrs converts a pattern to a WKD-IBE attribute list by hashing each
+// component.
+func (p Pattern) ToAttrs() wkdibe.AttributeList {
+	attrs := make(wkdibe.AttributeList)
+	for i, comp := range p {
+		if len(comp) != 0 {
+			attrs[wkdibe.AttributeIndex(i)] = cryptutils.HashToZp(new(big.Int), comp)
+		}
+	}
+	return attrs
+}
+
+// ToAttrsWithReference is the same as ToAttrs, but it uses a similar pattern
+// and its corresponding WKD-IBE attribute list to avoid hashing where
+// possible. Some of the big integers in the returned attribute list may be
+// aliased with those in the provided attribute list. the returned bool
+// indicates if p and q are equal.
+func (p Pattern) ToAttrsWithReference(q Pattern, qAttrs wkdibe.AttributeList) (wkdibe.AttributeList, bool) {
+	attrs := make(wkdibe.AttributeList)
+	equal := true
+	for i, comp := range p {
+		if len(comp) != 0 {
+			idx := wkdibe.AttributeIndex(i)
+			if bytes.Equal(comp, q[i]) {
+				attrs[idx] = qAttrs[idx]
+			} else {
+				attrs[idx] = cryptutils.HashToZp(new(big.Int), comp)
+				equal = false
+			}
+		} else if len(q[i]) != 0 {
+			equal = false
+		}
+	}
+	return attrs, equal
+}
+
 // EncodePattern encodes a URIPath and TimePath into a pattern, where each
 // component is represented as a byte slice. The slice into which to encode
-// the pattern is provided as an argument.
+// the pattern is provided as an argument. This is designed to be a helper
+// function; the "PatternEncoder" interface is designed to support flexible,
+// application-dependent encoding.
 func EncodePattern(uripath URIPath, timepath TimePath, into Pattern) {
 	if len(into) < len(uripath)+MaxTimeLength {
 		panic("Not enough space to encode pattern")

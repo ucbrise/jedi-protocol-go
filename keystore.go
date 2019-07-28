@@ -32,15 +32,11 @@
 
 package jedi
 
-import "github.com/ucbrise/jedi-pairing/lang/go/wkdibe"
+import (
+	"context"
+	"fmt"
 
-// KeyType describes a type of WKD-IBE secret key in the key store.
-type KeyType int
-
-// These constants enumerate the types of WKD-IBE secret keys in the key store.
-const (
-	KeyTypeDecryption = iota
-	KeyTypeSigning
+	"github.com/ucbrise/jedi-pairing/lang/go/wkdibe"
 )
 
 // KeyStoreReader represents a read-only interface to a key store that can be
@@ -62,10 +58,77 @@ const (
 type KeyStoreReader interface {
 	// ParamsForHierarchy retrieves the WKD-IBE public parameters used for a
 	// hierarchy.
-	ParamsForHierarchy(hierarchy []byte) (*wkdibe.Params, error)
+	ParamsForHierarchy(ctx context.Context, hierarchy []byte) (*wkdibe.Params, error)
 
-	// KeyForPattern retrieves a key whose pattern matches the provided URI
-	// and time, where "matches" is defined as in Section 3.1 of the JEDI paper
-	// (see the README.md file for a full citation of the paper).
-	KeyForPattern(hierarchy []byte, uripath URIPath, timepath TimePath, keyType KeyType) (*wkdibe.SecretKey, Pattern, error)
+	// KeyForPattern retrieves a key whose pattern matches the provided
+	// pattern, where "matches" is defined as in Section 3.1 of the JEDI paper
+	// (see the README.md file for a full citation of the paper). The pattern
+	// should be encoded from a URI and time using the application's
+	// PatternEncoder.
+	KeyForPattern(ctx context.Context, hierarchy []byte, pattern Pattern) (*wkdibe.SecretKey, Pattern, error)
+}
+
+// PatternType describes a type of permission encoded by a pattern.
+type PatternType int
+
+// These constants enumerate the types of WKD-IBE secret keys in the key store.
+const (
+	PatternTypeDecryption = iota
+	PatternTypeSigning
+)
+
+// PatternEncoder represents an algorithm to encode a URI and time into a
+// pattern. The EncodePattern() function is a good starting point, but a real
+// application needs to distinguish between encryption and signing keys, and
+// may choose to use extra slots to distinguish JEDI keys from other uses of
+// WKD-IBE.
+type PatternEncoder interface {
+	// Encode encodes URI and time into a pattern.
+	Encode(uriPath URIPath, timePath TimePath, patternType PatternType) Pattern
+}
+
+// DefaultPatternEncoder is a simple pattern encoding that will likely be
+// suitable for many applications.
+type DefaultPatternEncoder struct {
+	patternLength int
+}
+
+// NewDefaultPatternEncoder creates a new DefaultPatternEncoder, capable of
+// supporting the specified URI length, and returns it.
+func NewDefaultPatternEncoder(maxURILength int) *DefaultPatternEncoder {
+	return &DefaultPatternEncoder{
+		patternLength: maxURILength + MaxTimeLength,
+	}
+}
+
+// Prefixes attached to each component of a pattern encoded with the default
+// encoding.
+const (
+	decryptionDefaultPatternComponentPrefix = iota
+	signingDefaultPatternComponentPrefix
+)
+
+// Encode encodes a URI and time into a pattern, using the default encoding. It
+// attaches a prefix to each component of the pattern to distinguish decryption
+// keys from signing keys, but does not introduce any extra components in the
+// pattern.
+func (dpe *DefaultPatternEncoder) Encode(uriPath URIPath, timePath TimePath, patternType PatternType) Pattern {
+	pattern := make(Pattern, dpe.patternLength)
+	EncodePattern(uriPath, timePath, pattern)
+
+	var prefix byte
+	switch patternType {
+	case PatternTypeDecryption:
+		prefix = decryptionDefaultPatternComponentPrefix
+	case PatternTypeSigning:
+		prefix = signingDefaultPatternComponentPrefix
+	default:
+		panic(fmt.Sprintf("Unknown key type %d\n", patternType))
+	}
+
+	for i, comp := range pattern {
+		pattern[i] = append([]byte{prefix}, comp...)
+	}
+
+	return pattern
 }
