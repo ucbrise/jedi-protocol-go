@@ -35,6 +35,7 @@ package jedi
 import (
 	"context"
 	"crypto/aes"
+	"errors"
 	"time"
 
 	"github.com/ucbrise/jedi-pairing/lang/go/cryptutils"
@@ -71,13 +72,13 @@ func (state *ClientState) EncryptWithTime(ctx context.Context, hierarchy []byte,
 	/* Encode the pattern based on the URI path and time path. */
 	pattern := state.encoder.Encode(uriPath, timePath, PatternTypeDecryption)
 
-	return state.EncryptParsed(ctx, hierarchy, uriPath, pattern, message)
+	return state.EncryptWithPattern(ctx, hierarchy, uriPath, pattern, message)
 }
 
-// EncryptParsed is like Encrypt, but requires the Pattern to already be formed
-// already. This is useful if you've already parsed the URI, or are working
-// with the URI components directly.
-func (state *ClientState) EncryptParsed(ctx context.Context, hierarchy []byte, uriPath URIPath, pattern Pattern, message []byte) ([]byte, error) {
+// EncryptWithPattern is like Encrypt, but requires the Pattern to already be
+// formed. This is useful if you've already parsed the URI, or are working with
+// the URI components directly.
+func (state *ClientState) EncryptWithPattern(ctx context.Context, hierarchy []byte, uriPath URIPath, pattern Pattern, message []byte) ([]byte, error) {
 	var err error
 
 	/* Get WKD-IBE public parameters for the specified namespace. */
@@ -154,11 +155,10 @@ func (state *ClientState) EncryptParsed(ctx context.Context, hierarchy []byte, u
 			 */
 			if !identical {
 				/*
-				 * This is the common case --- we actually have to do some
-				 * crypto to compute the ciphertext. Adjust the precomputed
-				 * value in the entry, and set a flag so we remember to
-				 * actually do the encryption and update the entry's other
-				 * fields.
+				 * This is the common case after acquiring the lock as a
+				 * writer. Adjust the precomputed value in the entry, and set a
+				 * flag so we remember to actually do the encryption and update
+				 * the entry's other fields.
 				 */
 				wkdibe.AdjustPreparedAttributeList(entry.precomputed, params, entry.attrs, attrs)
 				updateEntryAndEncrypt = true
@@ -191,4 +191,126 @@ func (state *ClientState) EncryptParsed(ctx context.Context, hierarchy []byte, u
 	}
 
 	return encrypted, nil
+}
+
+// Decrypt decrypts a message encrypted with JEDI, reading from and mutating
+// the ClientState instance on which the function is invoked.
+func (state *ClientState) Decrypt(ctx context.Context, hierarchy []byte, uri string, timestamp time.Time, encrypted []byte) ([]byte, error) {
+	if len(encrypted) < EncryptedKeySize+aes.BlockSize {
+		return nil, errors.New("Encrypted blob is too short to be valid")
+	}
+	encryptedKey := encrypted[:EncryptedKeySize]
+	encryptedMessage := encrypted[EncryptedKeySize:]
+	return state.DecryptSeparated(ctx, hierarchy, uri, timestamp, encryptedKey, encryptedMessage)
+}
+
+// DecryptSeparated is the same as Decrypt, but accepts the encrypted message
+// in two parts: the WKD-IBE ciphertext of the encrypted symmetric key, and the
+// symmetric-key ciphertext of the encrypted message.
+func (state *ClientState) DecryptSeparated(ctx context.Context, hierarchy []byte, uri string, timestamp time.Time, encryptedKey []byte, encryptedMessage []byte) ([]byte, error) {
+	var err error
+
+	/* Parse the URI. */
+	var uriPath URIPath
+	if uriPath, err = ParseURI(uri); err != nil {
+		return nil, err
+	}
+
+	/* Parse the current time. */
+	var timePath TimePath
+	if timePath, err = ParseTime(timestamp); err != nil {
+		return nil, err
+	}
+
+	/* Encode the pattern based on the URI path and time path. */
+	pattern := state.encoder.Encode(uriPath, timePath, PatternTypeDecryption)
+
+	return state.DecryptWithPattern(ctx, hierarchy, pattern, encryptedKey, encryptedMessage)
+}
+
+// DecryptWithPattern is the same as Decrypt, but requires the Pattern to be
+// already formed. This is useful if the pattern itself was sent with the
+// message and is available directly in lieu of the URI and timestamp.
+func (state *ClientState) DecryptWithPattern(ctx context.Context, hierarchy []byte, pattern Pattern, encryptedKey []byte, encryptedMessage []byte) ([]byte, error) {
+	var err error
+
+	/* Sanity-check the length of the encryptedMessage and encryptedKey. */
+	if len(encryptedKey) != EncryptedKeySize {
+		return nil, errors.New("encryptedKey has invalid size")
+	}
+	if len(encryptedMessage) < aes.BlockSize {
+		return nil, errors.New("encryptedMessage has invalid size")
+	}
+
+	/* Check if we've cached the decryption of this ciphertext. */
+	var entryInt interface{}
+	if entryInt, err = state.cache.Get(ctx, decryptionCacheKey(encryptedKey)); err != nil {
+		return nil, err
+	}
+	entry := entryInt.(*decryptionCacheEntry)
+
+	var key [AESKeySize]byte
+
+	/*
+	 * Acquire the entry's lock as a reader, optimistically assuming it's
+	 * populated and we can skip the decryption.
+	 */
+	entry.lock.RLock()
+	if entry.populated {
+		/*
+		 * We've seen this ciphertext before and decrypted it, so just copy
+		 * the result.
+		 */
+		copy(key[:], entry.decrypted[:])
+		entry.lock.RUnlock()
+	} else {
+		/*
+		 * We need to decrypt the ciphertext and mutate this cache entry to
+		 * store the decrypted key.
+		 */
+		entry.lock.RUnlock()
+		entry.lock.Lock()
+
+		/*
+		 * Since we dropped the lock (as a reader) and re-acquired it as a
+		 * writer, another thread may have intervened and performed the
+		 * decryption for us, so check again just in case.
+		 */
+		if entry.populated {
+			/* The decryption is available now, so just copy it. */
+			copy(key[:], entry.decrypted[:])
+		} else {
+			/*
+			 * This is the common case after acquiring the lock as a writer.
+			 * Actually perform the decryption, store the result in the entry,
+			 * and then release the lock.
+			 */
+			var ciphertext wkdibe.Ciphertext
+			if !ciphertext.Unmarshal(encryptedKey, true, false) {
+				entry.lock.Unlock()
+				return nil, errors.New("malformed ciphertext")
+			}
+
+			var params *wkdibe.Params
+			var secretKey *wkdibe.SecretKey
+			if params, secretKey, err = state.store.KeyForPattern(ctx, hierarchy, pattern); err != nil {
+				return nil, err
+			}
+
+			secretKey = wkdibe.NonDelegableQualifyKey(params, secretKey, pattern.ToAttrs())
+
+			encryptable := wkdibe.Decrypt(&ciphertext, secretKey)
+			encryptable.HashToSymmetricKey(entry.decrypted[:])
+			copy(key[:], entry.decrypted[:])
+			entry.populated = true
+		}
+
+		entry.lock.Unlock()
+	}
+
+	decrypted := make([]byte, len(encryptedMessage)-aes.BlockSize)
+	if err = aesCTRDecryptInMem(decrypted, encryptedMessage, key[:]); err != nil {
+		return nil, err
+	}
+	return decrypted, nil
 }

@@ -65,7 +65,7 @@ type KeyStoreReader interface {
 	// (see the README.md file for a full citation of the paper). The pattern
 	// should be encoded from a URI and time using the application's
 	// PatternEncoder.
-	KeyForPattern(ctx context.Context, hierarchy []byte, pattern Pattern) (*wkdibe.SecretKey, Pattern, error)
+	KeyForPattern(ctx context.Context, hierarchy []byte, pattern Pattern) (*wkdibe.Params, *wkdibe.SecretKey, error)
 }
 
 // PatternType describes a type of permission encoded by a pattern.
