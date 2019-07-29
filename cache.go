@@ -38,7 +38,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 	"unsafe"
 
 	"github.com/samkumar/reqcache"
@@ -60,7 +59,6 @@ type hierarchyCacheEntry wkdibe.Params
 // encryptionCacheEntry stores cached data to accelerate encryption for a URI.
 type encryptionCacheEntry struct {
 	lock         sync.RWMutex
-	lastUpdated  time.Time
 	pattern      Pattern
 	attrs        wkdibe.AttributeList
 	key          [AESKeySize]byte
@@ -170,10 +168,7 @@ func NewClientState(keys KeyStoreReader, encoder PatternEncoder, capacity uint64
 				entry := new(decryptionCacheEntry)
 				/*
 				 * We can't populate this type of entry here, because we need
-				 * the URI and time to be able to decrypt the ciphertext. Even
-				 * if we found a way to obtain this info here, concurrent
-				 * callers could be using different URI and time information,
-				 * which could happen under certain attack scenarios.
+				 * the URI and time to be able to decrypt the ciphertext.
 				 */
 				size += uint64(unsafe.Sizeof(*entry))
 				return entry, size, nil

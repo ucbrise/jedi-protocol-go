@@ -47,14 +47,12 @@ import (
 var EncryptedKeySize = wkdibe.CiphertextMarshalledLength(true)
 
 // Encrypt encrypts a message using JEDI, reading from and mutating the
-// ClientState instance on which the function is invoked.
-func (state *ClientState) Encrypt(ctx context.Context, hierarchy []byte, uri string, message []byte) ([]byte, error) {
-	return state.EncryptWithTime(ctx, hierarchy, uri, time.Now(), message)
-}
-
-// EncryptWithTime is like Encrypt, but allows the timestamp used for
-// encryption to be specified.
-func (state *ClientState) EncryptWithTime(ctx context.Context, hierarchy []byte, uri string, timestamp time.Time, message []byte) ([]byte, error) {
+// ClientState instance on which the function is invoked. The "timestamp"
+// argument should be set to the current time in most cases, which can be
+// obtained by calling time.Now(). The function will work with any URI/time
+// combination, but for a single URI you should try to move chronologically
+// in time for the best performance.
+func (state *ClientState) Encrypt(ctx context.Context, hierarchy []byte, uri string, timestamp time.Time, message []byte) ([]byte, error) {
 	var err error
 
 	/* Parse the URI. */
@@ -86,7 +84,7 @@ func (state *ClientState) EncryptWithPattern(ctx context.Context, hierarchy []by
 	if paramsInt, err = state.cache.Get(ctx, hierarchyCacheKey(hierarchy)); err != nil {
 		return nil, err
 	}
-	params := paramsInt.(*wkdibe.Params)
+	params := (*wkdibe.Params)(paramsInt.(*hierarchyCacheEntry))
 
 	/* Get the cached state (if any) for this URI. */
 	var entryInt interface{}
@@ -194,7 +192,12 @@ func (state *ClientState) EncryptWithPattern(ctx context.Context, hierarchy []by
 }
 
 // Decrypt decrypts a message encrypted with JEDI, reading from and mutating
-// the ClientState instance on which the function is invoked.
+// the ClientState instance on which the function is invoked. It's very
+// important that message's integrity (e.g., signature) is verified before
+// calling this function. If not, an attacker could get us to decrypt a message
+// with the "wrong" URI/time; if this happens, an incorrect symmetric key will
+// be cached in the ClientState, denying service for future proper messages
+// reusing that pattern.
 func (state *ClientState) Decrypt(ctx context.Context, hierarchy []byte, uri string, timestamp time.Time, encrypted []byte) ([]byte, error) {
 	if len(encrypted) < EncryptedKeySize+aes.BlockSize {
 		return nil, errors.New("Encrypted blob is too short to be valid")

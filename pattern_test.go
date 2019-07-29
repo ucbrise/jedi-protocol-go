@@ -34,8 +34,13 @@ package jedi
 
 import (
 	"bytes"
+	"math/big"
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/ucbrise/jedi-pairing/lang/go/cryptutils"
+	"github.com/ucbrise/jedi-pairing/lang/go/wkdibe"
 )
 
 func checkURI(t *testing.T, uri string) {
@@ -227,4 +232,33 @@ func TestPatternMatchPanic(t *testing.T) {
 	pattern1 := make(Pattern, 19)
 	pattern2 := make(Pattern, 20)
 	pattern1.Matches(pattern2)
+}
+
+func TestPatternToAttrs(t *testing.T) {
+	pattern := make(Pattern, 20)
+	empty := make(Pattern, 20)
+
+	pattern[3] = []byte("abcd")
+	attrs1 := pattern.ToAttrs()
+
+	expectedAttrs := wkdibe.AttributeList{wkdibe.AttributeIndex(3): cryptutils.HashToZp(new(big.Int), []byte("abcd"))}
+	if !reflect.DeepEqual(attrs1, expectedAttrs) {
+		t.Fatal("attrs1 does not equal expected attribute list")
+	}
+
+	attrs2, equal := pattern.ToAttrsWithReference(empty, wkdibe.AttributeList{})
+	if equal {
+		t.Fatal("non-empty pattern declared equal to empty pattern")
+	}
+	if !reflect.DeepEqual(attrs2, expectedAttrs) {
+		t.Fatal("attrs2 does not equal expected attribute list")
+	}
+
+	attrs3, equal := empty.ToAttrsWithReference(pattern, expectedAttrs)
+	if equal {
+		t.Fatal("empty pattern declared equal to non-empty pattern")
+	}
+	if !reflect.DeepEqual(attrs3, wkdibe.AttributeList{}) {
+		t.Fatal("empty pattern has non-empty attribute list")
+	}
 }
