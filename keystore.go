@@ -127,7 +127,9 @@ func (dpe *DefaultPatternEncoder) Encode(uriPath URIPath, timePath TimePath, pat
 	}
 
 	for i, comp := range pattern {
-		pattern[i] = append([]byte{prefix}, comp...)
+		if len(comp) != 0 {
+			pattern[i] = append([]byte{prefix}, comp...)
+		}
 	}
 
 	return pattern
