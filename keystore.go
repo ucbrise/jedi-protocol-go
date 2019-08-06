@@ -56,16 +56,21 @@ import (
 // would implement a "default" key store, satisfying this interface, that could
 // be used to provide the functionality.
 type KeyStoreReader interface {
-	// ParamsForHierarchy retrieves the WKD-IBE public parameters used for a
-	// hierarchy.
-	ParamsForHierarchy(ctx context.Context, hierarchy []byte) (*wkdibe.Params, error)
-
 	// KeyForPattern retrieves a key whose pattern matches the provided
 	// pattern, where "matches" is defined as in Section 3.1 of the JEDI paper
 	// (see the README.md file for a full citation of the paper). The pattern
 	// should be encoded from a URI and time using the application's
 	// PatternEncoder.
 	KeyForPattern(ctx context.Context, hierarchy []byte, pattern Pattern) (*wkdibe.Params, *wkdibe.SecretKey, error)
+}
+
+// PublicInfoReader represents a read-only interface to the public parameters
+// for each hierarchy. It is similar to KeyStoreReader, in that it is meant to
+// be implemented by the calling application.
+type PublicInfoReader interface {
+	// ParamsForHierarchy retrieves the WKD-IBE public parameters used for a
+	// hierarchy.
+	ParamsForHierarchy(ctx context.Context, hierarchy []byte) (*wkdibe.Params, error)
 }
 
 // PatternType describes a type of permission encoded by a pattern.

@@ -40,7 +40,7 @@ import (
 
 func helperTestDelegation(t *testing.T, uri string, start time.Time, end time.Time) {
 	ctx := context.Background()
-	store := NewTestKeyStore()
+	_, store := NewTestKeyStore()
 	encoder := NewDefaultPatternEncoder(TestPatternSize - MaxTimeLength)
 
 	delegation, err := Delegate(ctx, store, encoder, TestHierarchy, uri, start, end, DecryptPermission|SignPermission)

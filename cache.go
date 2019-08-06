@@ -48,6 +48,7 @@ import (
 // ClientState is the state that JEDI principals keep in memory to accelerate
 // encryption, decryption, signing, and verification of messages.
 type ClientState struct {
+	info    PublicInfoReader
 	store   KeyStoreReader
 	encoder PatternEncoder
 	cache   *reqcache.LRUCache
@@ -137,8 +138,9 @@ func parsekey(key string) (keytype byte, content []byte) {
 // NewClientState creates a new ClientState abstraction with the specified
 // abstraction to the key store, algorithm to encode patterns, and memory
 // capacity (in bytes) to cache objects to accelerate JEDI's crypto operations.
-func NewClientState(keys KeyStoreReader, encoder PatternEncoder, capacity uint64) *ClientState {
+func NewClientState(public PublicInfoReader, keys KeyStoreReader, encoder PatternEncoder, capacity uint64) *ClientState {
 	state := new(ClientState)
+	state.info = public
 	state.store = keys
 	state.encoder = encoder
 
@@ -149,7 +151,7 @@ func NewClientState(keys KeyStoreReader, encoder PatternEncoder, capacity uint64
 			size := uint64(len(keystring))
 			switch keytype {
 			case cacheKeyTypeHierarchy:
-				params, err := state.store.ParamsForHierarchy(ctx, contentbytes)
+				params, err := state.info.ParamsForHierarchy(ctx, contentbytes)
 				if err != nil {
 					return nil, 0, err
 				}

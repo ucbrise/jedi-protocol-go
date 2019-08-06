@@ -49,19 +49,25 @@ var TestHierarchy = []byte("testHierarchy")
 const quote1 = "Imagination is more important than knowledge. --Albert Einstein"
 const quote2 = "Today is your day! / Your mountain is waiting. / So... get on your way! --Theodor Seuss Geisel"
 
+type TestPublicInfo struct {
+	params *wkdibe.Params
+}
+
+func (tpi *TestPublicInfo) ParamsForHierarchy(ctx context.Context, hierarchy []byte) (*wkdibe.Params, error) {
+	return tpi.params, nil
+}
+
 type TestKeyStore struct {
 	params *wkdibe.Params
 	master *wkdibe.MasterKey
 }
 
-func NewTestKeyStore() *TestKeyStore {
+func NewTestKeyStore() (*TestPublicInfo, *TestKeyStore) {
 	tks := new(TestKeyStore)
 	tks.params, tks.master = wkdibe.Setup(TestPatternSize, true)
-	return tks
-}
-
-func (tks *TestKeyStore) ParamsForHierarchy(ctx context.Context, hierarchy []byte) (*wkdibe.Params, error) {
-	return tks.params, nil
+	tpi := new(TestPublicInfo)
+	tpi.params = tks.params
+	return tpi, tks
 }
 
 func (tks *TestKeyStore) KeyForPattern(ctx context.Context, hierarchy []byte, pattern Pattern) (*wkdibe.Params, *wkdibe.SecretKey, error) {
@@ -70,9 +76,9 @@ func (tks *TestKeyStore) KeyForPattern(ctx context.Context, hierarchy []byte, pa
 }
 
 func NewTestState() *ClientState {
-	store := NewTestKeyStore()
+	info, store := NewTestKeyStore()
 	encoder := NewDefaultPatternEncoder(TestPatternSize - MaxTimeLength)
-	return NewClientState(store, encoder, 1<<20)
+	return NewClientState(info, store, encoder, 1<<20)
 }
 
 func testMessageTransfer(t *testing.T, state *ClientState, hierarchy []byte, uri string, timestamp time.Time, message string) {
