@@ -262,3 +262,44 @@ func TestPatternToAttrs(t *testing.T) {
 		t.Fatal("empty pattern has non-empty attribute list")
 	}
 }
+
+func TestPatternMarshal(t *testing.T) {
+	uripath1, err := ParseURI("a/b/c/*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	uripath2, err := ParseURI("a/b/c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	timepath, err := ParseTime(time.Unix(1564089385, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pattern1 := make(Pattern, 20)
+	EncodePattern(uripath1, timepath, pattern1)
+	pattern2 := make(Pattern, 20)
+	EncodePattern(uripath2, timepath, pattern2)
+
+	marshalled1 := pattern1.Marshal()
+	marshalled2 := pattern2.Marshal()
+
+	var unmarshalled1 Pattern
+	if !unmarshalled1.Unmarshal(marshalled1) {
+		t.Fatal("Could not unmarshal #1")
+	}
+
+	var unmarshalled2 Pattern
+	if !unmarshalled2.Unmarshal(marshalled2) {
+		t.Fatal("Could not unmarshal #2")
+	}
+
+	if !pattern1.Equals(unmarshalled1) {
+		t.Fatal("pattern1 is different after unmarshal")
+	}
+
+	if !pattern2.Equals(unmarshalled2) {
+		t.Fatal("pattern2 is different after unmarshal")
+	}
+}

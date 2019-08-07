@@ -48,6 +48,13 @@ func helperTestDelegation(t *testing.T, uri string, start time.Time, end time.Ti
 		t.Fatal(err)
 	}
 
+	/* Marshal and unmarshal the delegation, to check that as well. */
+	marshalled := delegation.Marshal()
+	delegation = new(Delegation)
+	if !delegation.Unmarshal(marshalled) {
+		t.Fatal("Could not unmarshal delegation")
+	}
+
 	/* Parse the URI. */
 	var uriPath URIPath
 	if uriPath, err = ParseURI(uri); err != nil {
