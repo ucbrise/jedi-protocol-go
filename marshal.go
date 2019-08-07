@@ -221,7 +221,9 @@ func (d *Delegation) Marshal() []byte {
 		panic("Invalid delegation")
 	}
 
-	buf := newMessageBuffer(2048, MarshalledTypeDelegation)
+	buf := newMessageBuffer(4096, MarshalledTypeDelegation)
+	buf = marshalAppendWithLength(newMarshallableBytes(d.Hierarchy), buf)
+	buf = marshalAppendWithLength(newMarshallableBytes(d.Params.Marshal(true)), buf)
 	buf = marshalAppendLength(len(d.Patterns), buf)
 
 	for i, pattern := range d.Patterns {
@@ -237,6 +239,21 @@ func (d *Delegation) Marshal() []byte {
 func (d *Delegation) Unmarshal(marshalled []byte) bool {
 	var buf []byte
 	if buf = checkMessageType(marshalled, MarshalledTypeDelegation); buf == nil {
+		return false
+	}
+
+	var hierarchy marshallableBytes
+	if buf, _ = unmarshalPrefixWithLength(&hierarchy, buf); buf == nil {
+		return false
+	}
+	d.Hierarchy = hierarchy.b
+
+	var marshalledParams marshallableBytes
+	if buf, _ = unmarshalPrefixWithLength(&marshalledParams, buf); buf == nil {
+		return false
+	}
+	d.Params = new(wkdibe.Params)
+	if !d.Params.Unmarshal(marshalledParams.b, true, false) {
 		return false
 	}
 

@@ -52,8 +52,10 @@ const (
 
 // Delegation is a bundle of keys that delegate permission.
 type Delegation struct {
-	Patterns []Pattern
-	Keys     []*wkdibe.SecretKey
+	Hierarchy []byte
+	Params    *wkdibe.Params
+	Patterns  []Pattern
+	Keys      []*wkdibe.SecretKey
 }
 
 // Delegate creates a new JEDI delegation conveying some permissions on a URI
@@ -112,6 +114,7 @@ func DelegateParsed(ctx context.Context, ks KeyStoreReader, pe PatternEncoder, h
 // DelegatePatterns creates a new JEDI delegation granting the permissions
 // conveyed in the set of provided patterns.
 func DelegatePatterns(ctx context.Context, ks KeyStoreReader, hierarchy []byte, patterns []Pattern) (*Delegation, error) {
+	var hierarchyParams *wkdibe.Params
 	keys := make([]*wkdibe.SecretKey, len(patterns))
 	for i, pattern := range patterns {
 		params, key, err := ks.KeyForPattern(ctx, hierarchy, pattern)
@@ -119,9 +122,14 @@ func DelegatePatterns(ctx context.Context, ks KeyStoreReader, hierarchy []byte, 
 			return nil, err
 		}
 		keys[i] = wkdibe.NonDelegableQualifyKey(params, key, pattern.ToAttrs())
+		if hierarchyParams == nil {
+			hierarchyParams = params
+		}
 	}
 	return &Delegation{
-		Patterns: patterns,
-		Keys:     keys,
+		Hierarchy: hierarchy,
+		Params:    hierarchyParams,
+		Patterns:  patterns,
+		Keys:      keys,
 	}, nil
 }
