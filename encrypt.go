@@ -297,6 +297,7 @@ func (state *ClientState) DecryptWithPattern(ctx context.Context, hierarchy []by
 			var params *wkdibe.Params
 			var secretKey *wkdibe.SecretKey
 			if params, secretKey, err = state.store.KeyForPattern(ctx, hierarchy, pattern); err != nil {
+				entry.lock.Unlock()
 				return nil, err
 			}
 
