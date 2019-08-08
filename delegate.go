@@ -34,6 +34,7 @@ package jedi
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/ucbrise/jedi-pairing/lang/go/wkdibe"
@@ -120,6 +121,9 @@ func DelegatePatterns(ctx context.Context, ks KeyStoreReader, hierarchy []byte, 
 		params, key, err := ks.KeyForPattern(ctx, hierarchy, pattern)
 		if err != nil {
 			return nil, err
+		}
+		if key == nil {
+			return nil, errors.New("could not generate key: requisite delegation(s) not received")
 		}
 		keys[i] = wkdibe.NonDelegableQualifyKey(params, key, pattern.ToAttrs())
 		if hierarchyParams == nil {

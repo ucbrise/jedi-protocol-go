@@ -300,6 +300,10 @@ func (state *ClientState) DecryptWithPattern(ctx context.Context, hierarchy []by
 				entry.lock.Unlock()
 				return nil, err
 			}
+			if secretKey == nil {
+				entry.lock.Unlock()
+				return nil, errors.New("could not find suitable key for decryption: requisite delegation(s) not received")
+			}
 
 			secretKey = wkdibe.NonDelegableQualifyKey(params, secretKey, pattern.ToAttrs())
 
